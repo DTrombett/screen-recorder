@@ -9,6 +9,10 @@ import { createInterface } from "./readline";
 let child: ChildProcess | undefined;
 const startController = new AbortController();
 const stopKeys = [0x71, /* Ctrl+C */ 0x03, /* Ctrl+D */ 0x04, /* Space */ 0x20];
+const defaults = {
+	fps: 30,
+	quality: 1,
+};
 
 stdin.setRawMode(true);
 stdin.on("data", (data) => {
@@ -20,7 +24,7 @@ stdin.on("data", (data) => {
 const rl = createInterface({
 	input: stdin,
 	output: stdout,
-	history: ["60", "1", "1"],
+	history: ["30"],
 	removeHistoryDuplicates: true,
 	tabSize: 4,
 });
@@ -39,17 +43,17 @@ const fps = await rl
 	.then((f) => {
 		const n = parseInt(f);
 
-		return !n || n < 24 || n > 30 ? 30 : n;
+		return !n || n < 24 || n > 30 ? defaults.fps : n;
 	})
-	.catch(() => 30);
+	.catch(() => defaults.fps);
 const quality = await rl
 	.question("quality (1-31): (31) ", { signal: startController.signal })
 	.then((q) => {
 		const n = parseInt(q);
 
-		return !n || n < 1 || n > 31 ? 1 : 32 - n;
+		return !n || n < 1 || n > 31 ? defaults.quality : 32 - n;
 	})
-	.catch(() => 1);
+	.catch(() => defaults.quality);
 
 child = execFile(ffmpeg, [
 	"-f",
@@ -66,7 +70,7 @@ child = execFile(ffmpeg, [
 ]);
 
 if (!child.stderr || !child.stdin) {
-	console.log("Cannot initialize ffmpeg correctly.");
+	console.error("Cannot initialize ffmpeg correctly.");
 	exit(1);
 }
 child.stderr.pipe(stderr);

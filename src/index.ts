@@ -115,4 +115,6 @@ if (!child.stderr || !child.stdin) {
 	exit(1);
 }
 child.stderr.pipe(stderr);
-child.on("close", exit);
+child.on("close", (code) => {
+	exit(code ?? 1);
+});

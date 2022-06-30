@@ -1,6 +1,8 @@
 import ffmpeg from "ffmpeg-static";
 import type { ChildProcess } from "node:child_process";
 import { execFile } from "node:child_process";
+import { unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cwd, exit, stderr, stdin, stdout } from "node:process";
 import { createInterface } from "./readline";
@@ -38,9 +40,9 @@ console.log(
 console.log("Press ^C at any time to quit or ^S to start the recording.");
 
 const file = await rl
-	.question("file-entry: (<date>.avi) ", { signal: startController.signal })
-	.then((entry) => join(cwd(), entry || `${Date.now()}.avi`))
-	.catch(() => `${Date.now()}.avi`);
+	.question("file-entry: (<date>.mp4) ", { signal: startController.signal })
+	.then((entry) => join(cwd(), entry || `${Date.now()}.mp4`))
+	.catch(() => `${Date.now()}.mp4`);
 const fps = await rl
 	.question("fps-max (24-30): (30) ", { signal: startController.signal })
 	.then((f) => {
@@ -77,6 +79,7 @@ const audioQuality = withAudio
 			})
 			.catch(() => defaults.audioQuality)
 	: 0;
+const tmpFilePath = join(tmpdir(), `${Date.now()}.avi`);
 
 child = execFile(ffmpeg, [
 	"-f",
@@ -91,7 +94,7 @@ child = execFile(ffmpeg, [
 	`${videoQuality}`,
 	"-qp",
 	"0",
-	file,
+	tmpFilePath,
 	...(withAudio
 		? [
 				"-f",
@@ -115,6 +118,21 @@ if (!child.stderr || !child.stdin) {
 	exit(1);
 }
 child.stderr.pipe(stderr);
-child.on("close", (code) => {
-	exit(code ?? 1);
+child.once("close", (code) => {
+	if (code !== 0) exit(code ?? 1);
+	child = execFile(ffmpeg, [
+		"-i",
+		tmpFilePath,
+		"-c:v",
+		"copy",
+		"-c:a",
+		"copy",
+		"-y",
+		file,
+	]);
+
+	child.stderr?.pipe(stderr);
+	child.once("close", (c) => {
+		unlink(tmpFilePath).finally(() => exit(c ?? 1));
+	});
 });

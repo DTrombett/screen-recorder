@@ -8,3 +8,4 @@ dist/
 database/
 tmp/
 *.avi
+*.mp4

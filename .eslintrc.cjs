@@ -28,7 +28,6 @@ module.exports = {
 		"curly": ["warn", "multi"],
 		"dot-location": ["warn", "property"],
 		"eqeqeq": ["warn", "smart"],
-		"no-console": "warn",
 		"no-else-return": [
 			"warn",
 			{
@@ -57,7 +56,6 @@ module.exports = {
 		],
 		"no-undef-init": "warn",
 		"array-bracket-newline": ["warn", "consistent"],
-		"array-element-newline": ["warn", "consistent"],
 		"computed-property-spacing": "warn",
 		"new-parens": "warn",
 		"no-async-promise-executor": "off",

@@ -11,7 +11,8 @@ const startController = new AbortController();
 const stopKeys = [0x71, /* Ctrl+C */ 0x03, /* Ctrl+D */ 0x04, /* Space */ 0x20];
 const defaults = {
 	fps: 30,
-	quality: 1,
+	videoQuality: 1,
+	audioQuality: 1,
 };
 
 stdin.setRawMode(true);
@@ -19,6 +20,8 @@ stdin.on("data", (data) => {
 	if (data[0] === 0x13 /* Ctrl+S */) startController.abort();
 	else if (data[0] === 0x03 /* Ctrl+C */ && !child) exit(0);
 	else if (stopKeys.includes(data[0]) && child) child.stdin!.write("q\n");
+	else if ((data[0] === 0x79 /* y */ || data[0] === 0x59) /* Y */ && child)
+		child.stdin!.write("y\n");
 });
 
 const rl = createInterface({
@@ -46,27 +49,65 @@ const fps = await rl
 		return !n || n < 24 || n > 30 ? defaults.fps : n;
 	})
 	.catch(() => defaults.fps);
-const quality = await rl
-	.question("quality (1-31): (31) ", { signal: startController.signal })
+const videoQuality = await rl
+	.question("video-quality (1-31): (31) ", { signal: startController.signal })
 	.then((q) => {
 		const n = parseInt(q);
 
-		return !n || n < 1 || n > 31 ? defaults.quality : 32 - n;
+		return !n || n < 1 || n > 31 ? defaults.videoQuality : 32 - n;
 	})
-	.catch(() => defaults.quality);
+	.catch(() => defaults.videoQuality);
+const withAudio = await rl
+	.question("with-audio (y/n): (y) ", { signal: startController.signal })
+	.then((a) => {
+		const n = a.toLowerCase();
+
+		return !n || n === "y" || n === "yes";
+	})
+	.catch(() => true);
+const audioQuality = withAudio
+	? await rl
+			.question("audio-quality (1-31): (31) ", {
+				signal: startController.signal,
+			})
+			.then((q) => {
+				const n = parseInt(q);
+
+				return !n || n < 1 || n > 31 ? defaults.audioQuality : 32 - n;
+			})
+			.catch(() => defaults.audioQuality)
+	: 0;
 
 child = execFile(ffmpeg, [
 	"-f",
 	"gdigrab",
+	"-thread_queue_size",
+	"4096",
 	"-framerate",
 	`${fps}`,
 	"-i",
 	"desktop",
 	"-q:v",
-	`${quality}`,
+	`${videoQuality}`,
 	"-qp",
 	"0",
 	file,
+	...(withAudio
+		? [
+				"-f",
+				"dshow",
+				"-thread_queue_size",
+				"4096",
+				"-i",
+				"audio=Stereo Mix (Realtek(R) Audio)",
+				"-q:a",
+				`${audioQuality}`,
+				"-qp",
+				"0",
+				"-pix_fmt",
+				"gbrapf32be",
+		  ]
+		: []),
 ]);
 
 if (!child.stderr || !child.stdin) {

@@ -5,15 +5,10 @@ import { join } from "node:path";
 import { cwd, exit, stderr, stdin, stdout } from "node:process";
 import { createInterface } from "./readline";
 
-// TODO: probesize
-
 // eslint-disable-next-line prefer-const
 let child: ChildProcess | undefined;
 const startController = new AbortController();
-const stopKeys = [
-	0x71, /* Ctrl+C */ 0x03, /* Ctrl+D */ 0x04, /* Space */ 0x20,
-	/* Enter */ 0x0a,
-];
+const stopKeys = [0x71, /* Ctrl+C */ 0x03, /* Ctrl+D */ 0x04, /* Space */ 0x20];
 
 stdin.setRawMode(true);
 stdin.on("data", (data) => {
@@ -40,15 +35,19 @@ const file = await rl
 	.then((entry) => join(cwd(), entry || `${Date.now()}.avi`))
 	.catch(() => `${Date.now()}.avi`);
 const fps = await rl
-	.question("fps: (60) ", { signal: startController.signal })
-	.then((f) => parseInt(f) || 60)
-	.catch(() => 60);
+	.question("fps-max (24-30): (30) ", { signal: startController.signal })
+	.then((f) => {
+		const n = parseInt(f);
+
+		return !n || n < 24 || n > 30 ? 30 : n;
+	})
+	.catch(() => 30);
 const quality = await rl
 	.question("quality (1-31): (31) ", { signal: startController.signal })
 	.then((q) => {
-		const i = parseInt(q);
+		const n = parseInt(q);
 
-		return !i || i < 1 || i > 31 ? 1 : 32 - i;
+		return !n || n < 1 || n > 31 ? 1 : 32 - n;
 	})
 	.catch(() => 1);
 
@@ -61,6 +60,8 @@ child = execFile(ffmpeg, [
 	"desktop",
 	"-q:v",
 	`${quality}`,
+	"-qp",
+	"0",
 	file,
 ]);
 

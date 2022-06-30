@@ -2,9 +2,9 @@ import ffmpeg from "ffmpeg-static";
 import type { ChildProcess } from "node:child_process";
 import { execFile } from "node:child_process";
 import { unlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { cwd, exit, stderr, stdin, stdout } from "node:process";
+import { exit, stderr, stdin, stdout } from "node:process";
 import { createInterface } from "./readline";
 
 // eslint-disable-next-line prefer-const
@@ -37,12 +37,18 @@ const rl = createInterface({
 console.log(
 	"This simple program will start a screen recording with custom settings using ffmpeg.\n"
 );
+// TODO: check if Videos/Captures exists
+console.log(
+	"By default the video will be saved in the /Videos/Captures folder of your home directory but you can change it by using standard path notation.\n"
+);
 console.log("Press ^C at any time to quit or ^S to start the recording.");
 
 const file = await rl
 	.question("file-entry: (<date>.mp4) ", { signal: startController.signal })
-	.then((entry) => join(cwd(), entry || `${Date.now()}.mp4`))
-	.catch(() => `${Date.now()}.mp4`);
+	.then((entry) =>
+		join(homedir(), "Videos", "Captures", entry || `${Date.now()}.mp4`)
+	)
+	.catch(() => join(homedir(), "Videos", "Captures", `${Date.now()}.mp4`));
 const fps = await rl
 	.question("fps-max (24-30): (30) ", { signal: startController.signal })
 	.then((f) => {

@@ -4,12 +4,10 @@ import { execFile } from "node:child_process";
 import { stat, unlink } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { exit, stderr, stdin, stdout } from "node:process";
+import { cwd, exit, stderr, stdin, stdout } from "node:process";
 import { createInterface } from "./readline";
 
-// eslint-disable-next-line prefer-const
 let child: ChildProcess | undefined;
-let startDir = join(homedir(), "Videos", "Captures");
 const startController = new AbortController();
 const stopKeys = [0x71, /* Ctrl+C */ 0x03, /* Ctrl+D */ 0x04, /* Space */ 0x20];
 const defaults = {
@@ -17,7 +15,17 @@ const defaults = {
 	videoQuality: 1,
 	audioQuality: 1,
 } as const;
-const date = new Date();
+const formatDate = (date: Date) =>
+	`${date.getDate().toString().padStart(2, "0")}-${date
+		.getMonth()
+		.toString()
+		.padStart(2, "0")}-${date.getFullYear()} ${date
+		.getHours()
+		.toString()
+		.padStart(2, "0")}-${date.getMinutes().toString().padStart(2, "0")}-${date
+		.getSeconds()
+		.toString()
+		.padStart(2, "0")}` as const;
 const rl = createInterface({
 	input: stdin,
 	output: stdout,
@@ -34,67 +42,69 @@ stdin.on("data", (data) => {
 	else if ((data[0] === 0x79 /* y */ || data[0] === 0x59) /* Y */ && child)
 		child.stdin!.write("y\n");
 });
+
+console.log(
+	"This simple program will start a screen recording with custom settings using ffmpeg.\nYou can also just record the audio without any video.\n"
+);
+console.log(
+	"By default the record will be saved in the /Videos/Captures or /Music folder of your home directory if it exists and to the current working directory otherwise.\nYou can change it by using standard path notation.\n"
+);
+console.log("Press ^C at any time to quit or ^S to start the recording.");
+
+const [withVideo, withAudio] = await rl
+	.question("input (v/a): (va) ", { signal: startController.signal })
+	.then((a) => {
+		const n = a.toLowerCase();
+
+		if (/^(v|a|va|av)$/.test(n)) return [n.includes("v"), n.includes("a")];
+		throw new Error();
+	})
+	.catch(() => [true, true]);
+let startDir = withVideo
+	? join(homedir(), "Videos", "Captures")
+	: join(homedir(), "Music");
+
 await stat(startDir)
 	.then((s) => {
 		if (!s.isDirectory()) throw new Error();
 	})
 	.catch(() => {
-		startDir = tmpdir();
+		startDir = cwd();
 	});
-
-console.log(
-	"This simple program will start a screen recording with custom settings using ffmpeg.\n"
-);
-console.log(
-	"By default the video will be saved in the /Videos/Captures folder of your home directory if it exists and to the current working directory otherwise.\nYou can change it by using standard path notation.\n"
-);
-console.log("Press ^C at any time to quit or ^S to start the recording.");
-
 const file = await rl
-	.question("file-entry: (<date>.mp4) ", { signal: startController.signal })
+	.question(`file-entry: (<date>.${withVideo ? "mp4" : "mp3"}) `, {
+		signal: startController.signal,
+	})
 	.then((entry) => {
-		if (entry) return join(startDir, entry);
+		if (entry)
+			return join(startDir, entry.replaceAll("<date>", formatDate(new Date())));
 		throw new Error();
 	})
 	.catch(() =>
-		join(
-			startDir,
-			`${date.getDate().toString().padStart(2, "0")}-${date
-				.getMonth()
-				.toString()
-				.padStart(2, "0")}-${date.getFullYear()} ${date
-				.getHours()
-				.toString()
-				.padStart(2, "0")}-${date
-				.getMinutes()
-				.toString()
-				.padStart(2, "0")}-${date.getSeconds().toString().padStart(2, "0")}.mp4`
-		)
+		join(startDir, `${formatDate(new Date())}.${withVideo ? "mp4" : "mp3"}`)
 	);
-const fps = await rl
-	.question("fps-max (24-30): (30) ", { signal: startController.signal })
-	.then((f) => {
-		const n = parseInt(f);
+const fps = withVideo
+	? await rl
+			.question("fps-max (24-30): (30) ", { signal: startController.signal })
+			.then((f) => {
+				const n = parseInt(f);
 
-		return !n || n < 24 || n > 30 ? defaults.fps : n;
-	})
-	.catch(() => defaults.fps);
-const videoQuality = await rl
-	.question("video-quality (1-31): (31) ", { signal: startController.signal })
-	.then((q) => {
-		const n = parseInt(q);
+				return !n || n < 24 || n > 30 ? defaults.fps : n;
+			})
+			.catch(() => defaults.fps)
+	: defaults.fps;
+const videoQuality = withVideo
+	? await rl
+			.question("video-quality (1-31): (31) ", {
+				signal: startController.signal,
+			})
+			.then((q) => {
+				const n = parseInt(q);
 
-		return !n || n < 1 || n > 31 ? defaults.videoQuality : 32 - n;
-	})
-	.catch(() => defaults.videoQuality);
-const withAudio = await rl
-	.question("with-audio (y/n): (y) ", { signal: startController.signal })
-	.then((a) => {
-		const n = a.toLowerCase();
-
-		return !n || n === "y" || n === "yes";
-	})
-	.catch(() => true);
+				return !n || n < 1 || n > 31 ? defaults.videoQuality : 32 - n;
+			})
+			.catch(() => defaults.videoQuality)
+	: defaults.videoQuality;
 const audioQuality = withAudio
 	? await rl
 			.question("audio-quality (1-31): (31) ", {
@@ -106,29 +116,36 @@ const audioQuality = withAudio
 				return !n || n < 1 || n > 31 ? defaults.audioQuality : 32 - n;
 			})
 			.catch(() => defaults.audioQuality)
-	: 0;
-const tmpFilePath = join(tmpdir(), `${Date.now()}.avi`);
+	: defaults.audioQuality;
+const tmpFilePath = join(
+	tmpdir(),
+	`${Date.now()}.${withVideo ? "mp4" : "mp3"}`
+);
 
 child = execFile(ffmpeg, [
-	"-f",
-	"gdigrab",
-	"-thread_queue_size",
-	"4096",
-	"-framerate",
-	`${fps}`,
-	"-i",
-	"desktop",
-	"-q:v",
-	`${videoQuality}`,
-	"-qp",
-	"0",
+	...(withVideo
+		? [
+				"-f",
+				"gdigrab",
+				"-thread_queue_size",
+				"4096",
+				"-framerate",
+				`${fps}`,
+				"-i",
+				"desktop",
+				"-q:v",
+				`${videoQuality}`,
+				"-qp",
+				"0",
+		  ]
+		: []),
 	tmpFilePath,
 	...(withAudio
 		? [
 				"-f",
 				"dshow",
 				"-thread_queue_size",
-				"4096",
+				"1024",
 				"-i",
 				"audio=Stereo Mix (Realtek(R) Audio)",
 				"-q:a",

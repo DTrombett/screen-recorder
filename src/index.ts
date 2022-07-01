@@ -1,7 +1,7 @@
 import ffmpeg from "ffmpeg-static";
 import type { ChildProcess } from "node:child_process";
 import { execFile } from "node:child_process";
-import { unlink } from "node:fs/promises";
+import { stat, unlink } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { exit, stderr, stdin, stdout } from "node:process";
@@ -9,13 +9,22 @@ import { createInterface } from "./readline";
 
 // eslint-disable-next-line prefer-const
 let child: ChildProcess | undefined;
+let startDir = join(homedir(), "Videos", "Captures");
 const startController = new AbortController();
 const stopKeys = [0x71, /* Ctrl+C */ 0x03, /* Ctrl+D */ 0x04, /* Space */ 0x20];
 const defaults = {
 	fps: 30,
 	videoQuality: 1,
 	audioQuality: 1,
-};
+} as const;
+const date = new Date();
+const rl = createInterface({
+	input: stdin,
+	output: stdout,
+	history: ["30"],
+	removeHistoryDuplicates: true,
+	tabSize: 4,
+});
 
 stdin.setRawMode(true);
 stdin.on("data", (data) => {
@@ -25,30 +34,43 @@ stdin.on("data", (data) => {
 	else if ((data[0] === 0x79 /* y */ || data[0] === 0x59) /* Y */ && child)
 		child.stdin!.write("y\n");
 });
-
-const rl = createInterface({
-	input: stdin,
-	output: stdout,
-	history: ["30"],
-	removeHistoryDuplicates: true,
-	tabSize: 4,
-});
+await stat(startDir)
+	.then((s) => {
+		if (!s.isDirectory()) throw new Error();
+	})
+	.catch(() => {
+		startDir = tmpdir();
+	});
 
 console.log(
 	"This simple program will start a screen recording with custom settings using ffmpeg.\n"
 );
-// TODO: check if Videos/Captures exists
 console.log(
-	"By default the video will be saved in the /Videos/Captures folder of your home directory but you can change it by using standard path notation.\n"
+	"By default the video will be saved in the /Videos/Captures folder of your home directory if it exists and to the current working directory otherwise.\nYou can change it by using standard path notation.\n"
 );
 console.log("Press ^C at any time to quit or ^S to start the recording.");
 
 const file = await rl
 	.question("file-entry: (<date>.mp4) ", { signal: startController.signal })
-	.then((entry) =>
-		join(homedir(), "Videos", "Captures", entry || `${Date.now()}.mp4`)
-	)
-	.catch(() => join(homedir(), "Videos", "Captures", `${Date.now()}.mp4`));
+	.then((entry) => {
+		if (entry) return join(startDir, entry);
+		throw new Error();
+	})
+	.catch(() =>
+		join(
+			startDir,
+			`${date.getDate().toString().padStart(2, "0")}-${date
+				.getMonth()
+				.toString()
+				.padStart(2, "0")}-${date.getFullYear()} ${date
+				.getHours()
+				.toString()
+				.padStart(2, "0")}-${date
+				.getMinutes()
+				.toString()
+				.padStart(2, "0")}-${date.getSeconds().toString().padStart(2, "0")}.mp4`
+		)
+	);
 const fps = await rl
 	.question("fps-max (24-30): (30) ", { signal: startController.signal })
 	.then((f) => {

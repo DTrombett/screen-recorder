@@ -15,6 +15,7 @@ const defaults = {
 	videoQuality: 1,
 	audioQuality: 1,
 } as const;
+const args: string[] = [];
 const formatDate = (date: Date) =>
 	`${date.getDate().toString().padStart(2, "0")}-${date
 		.getMonth()
@@ -119,45 +120,35 @@ const audioQuality = withAudio
 	: defaults.audioQuality;
 const tmpFilePath = join(
 	tmpdir(),
-	`${Date.now()}.${withVideo ? "mp4" : "mp3"}`
+	`${Date.now()}.${withVideo ? "avi" : "mp3"}`
 );
 
-child = execFile(ffmpeg, [
-	...(withVideo
-		? [
-				"-f",
-				"gdigrab",
-				"-thread_queue_size",
-				"4096",
-				"-framerate",
-				`${fps}`,
-				"-i",
-				"desktop",
-				"-q:v",
-				`${videoQuality}`,
-				"-qp",
-				"0",
-		  ]
-		: []),
-	tmpFilePath,
-	...(withAudio
-		? [
-				"-f",
-				"dshow",
-				"-thread_queue_size",
-				"1024",
-				"-i",
-				"audio=Stereo Mix (Realtek(R) Audio)",
-				"-q:a",
-				`${audioQuality}`,
-				"-qp",
-				"0",
-				"-pix_fmt",
-				"gbrapf32be",
-		  ]
-		: []),
-]);
-
+if (withVideo)
+	args.push(
+		"-f",
+		"gdigrab",
+		"-thread_queue_size",
+		"4096",
+		"-framerate",
+		`${fps}`,
+		"-i",
+		"desktop"
+	);
+if (withAudio)
+	args.push(
+		"-f",
+		"dshow",
+		"-thread_queue_size",
+		"4096",
+		"-i",
+		"audio=Stereo Mix (Realtek(R) Audio)",
+		"-q:a",
+		`${audioQuality}`
+	);
+if (withVideo) args.push("-q:v", `${videoQuality}`);
+args.push(tmpFilePath);
+console.log(`\nffmpeg ${args.join(" ")}`);
+child = execFile(ffmpeg, args);
 if (!child.stderr || !child.stdin) {
 	console.error("Cannot initialize ffmpeg correctly.");
 	exit(1);
@@ -175,7 +166,6 @@ child.once("close", (code) => {
 		"-y",
 		file,
 	]);
-
 	child.stderr?.pipe(stderr);
 	child.once("close", (c) => {
 		unlink(tmpFilePath).finally(() => exit(c ?? 1));

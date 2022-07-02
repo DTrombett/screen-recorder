@@ -17,7 +17,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=18.x"
+    "node": ">=14.x"
   },
   "repository": {
     "type": "git",
@@ -30,7 +30,7 @@
     "ffmpeg-static": "^5.0.2"
   },
   "devDependencies": {
-    "@tsconfig/node18": "^1.0.1",
+    "@tsconfig/node14": "^1.0.3",
     "@types/ffmpeg-static": "^3.0.1",
     "@types/node": "^18.0.0",
     "@typescript-eslint/eslint-plugin": "^5.30.0",

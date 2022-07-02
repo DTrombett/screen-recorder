@@ -78,7 +78,7 @@ const file = await rl
 	})
 	.then((entry) => {
 		if (entry)
-			return join(startDir, entry.replaceAll("<date>", formatDate(new Date())));
+			return join(startDir, entry.replace(/<date>/g, formatDate(new Date())));
 		throw new Error();
 	})
 	.catch(() =>

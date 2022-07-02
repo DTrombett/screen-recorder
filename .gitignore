@@ -10,4 +10,5 @@ tmp/
 *.avi
 *.mp4
 *.mp3
+*.exe
 test.js

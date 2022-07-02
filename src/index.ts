@@ -5,10 +5,10 @@ import { stat, unlink } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { cwd, exit, stderr, stdin, stdout } from "node:process";
-import { createInterface } from "./readline";
+import { createInterface } from "node:readline";
 
 let child: ChildProcess | undefined;
-const startController = new AbortController();
+let started = false;
 const stopKeys = [0x71, /* Ctrl+C */ 0x03, /* Ctrl+D */ 0x04, /* Space */ 0x20];
 const defaults = {
 	fps: 30,
@@ -30,15 +30,30 @@ const formatDate = (date: Date) =>
 const rl = createInterface({
 	input: stdin,
 	output: stdout,
-	history: ["30"],
 	removeHistoryDuplicates: true,
 	tabSize: 4,
 });
+const question = (query: string) =>
+	new Promise<string>((resolve, reject) => {
+		if (started) {
+			reject(new Error("Aborted"));
+			return;
+		}
+		rl.question(query, resolve);
+		rl.on("close", () => {
+			reject(new Error("Aborted"));
+		});
+	});
 
 stdin.setRawMode(true);
+stdin.resume();
 stdin.on("data", (data) => {
-	if (data[0] === 0x13 /* Ctrl+S */) startController.abort();
-	else if (data[0] === 0x03 /* Ctrl+C */ && !child) exit(0);
+	if (data[0] === 0x13 /* Ctrl+S */) {
+		started = true;
+		rl.close();
+		stdin.setRawMode(true);
+		stdin.resume();
+	} else if (data[0] === 0x03 /* Ctrl+C */ && !child) exit(0);
 	else if (stopKeys.includes(data[0]) && child) child.stdin!.write("q\n");
 	else if ((data[0] === 0x79 /* y */ || data[0] === 0x59) /* Y */ && child)
 		child.stdin!.write("y\n");
@@ -52,8 +67,7 @@ console.log(
 );
 console.log("Press ^C at any time to quit or ^S to start the recording.");
 
-const [withVideo, withAudio] = await rl
-	.question("input (v/a): (va) ", { signal: startController.signal })
+const [withVideo, withAudio] = await question("input (v/a): (va) ")
 	.then((a) => {
 		const n = a.toLowerCase();
 
@@ -72,10 +86,9 @@ await stat(startDir)
 	.catch(() => {
 		startDir = cwd();
 	});
-const file = await rl
-	.question(`file-entry: (<date>.${withVideo ? "mp4" : "mp3"}) `, {
-		signal: startController.signal,
-	})
+const file = await question(
+	`file-entry: (<date>.${withVideo ? "mp4" : "mp3"}) `
+)
 	.then((entry) => {
 		if (entry)
 			return join(startDir, entry.replace(/<date>/g, formatDate(new Date())));
@@ -85,8 +98,7 @@ const file = await rl
 		join(startDir, `${formatDate(new Date())}.${withVideo ? "mp4" : "mp3"}`)
 	);
 const fps = withVideo
-	? await rl
-			.question("fps-max (24-30): (30) ", { signal: startController.signal })
+	? await question("fps-max (24-30): (30) ")
 			.then((f) => {
 				const n = parseInt(f);
 
@@ -95,10 +107,7 @@ const fps = withVideo
 			.catch(() => defaults.fps)
 	: defaults.fps;
 const videoQuality = withVideo
-	? await rl
-			.question("video-quality (1-31): (31) ", {
-				signal: startController.signal,
-			})
+	? await question("video-quality (1-31): (31) ")
 			.then((q) => {
 				const n = parseInt(q);
 
@@ -107,10 +116,7 @@ const videoQuality = withVideo
 			.catch(() => defaults.videoQuality)
 	: defaults.videoQuality;
 const audioQuality = withAudio
-	? await rl
-			.question("audio-quality (1-31): (31) ", {
-				signal: startController.signal,
-			})
+	? await question("audio-quality (1-31): (31) ")
 			.then((q) => {
 				const n = parseInt(q);
 

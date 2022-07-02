@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "description": "A simple screen recorder",
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && nexe dist/index.js -t 14.15.1",
     "lint": "eslint src --fix",
     "prepare": "npm test",
     "prettier": "prettier --write src/**/*.ts",
@@ -32,7 +32,7 @@
   "devDependencies": {
     "@tsconfig/node14": "^1.0.3",
     "@types/ffmpeg-static": "^3.0.1",
-    "@types/node": "^18.0.0",
+    "@types/node": "^14.18.21",
     "@typescript-eslint/eslint-plugin": "^5.30.0",
     "@typescript-eslint/parser": "^5.30.0",
     "eslint": "^8.18.0",

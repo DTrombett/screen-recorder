@@ -20,6 +20,5 @@
 		"pretty": true,
 		"resolveJsonModule": true,
 		"sourceMap": true,
-		"module": "ESNext",
 	}
 }

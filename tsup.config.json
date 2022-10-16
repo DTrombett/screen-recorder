@@ -3,6 +3,9 @@
 	"entry": [
 		"src/index.ts"
 	],
+	"format":[
+		"esm"
+	],
 	"minify": true,
 	"platform": "node",
 	"sourcemap": true,

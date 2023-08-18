@@ -27,7 +27,7 @@
     "url": "https://github.com/DTrombett/screen-recorder/issues"
   },
   "dependencies": {
-    "ffmpeg-static": "^5.1.0"
+    "ffmpeg-static": "^5.2.0"
   },
   "devDependencies": {
     "@tsconfig/node18": "^2.0.1",
